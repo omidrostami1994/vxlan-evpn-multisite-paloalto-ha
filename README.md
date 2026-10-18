@@ -63,18 +63,6 @@ With the DC1 firewall active and the DC2 firewall passive:
 - The checked routes on DC1 used local static routes with administrative distance 1.
 - The checked routes on DC2 used EVPN-learned BGP routes with administrative distance 20.
 
-These checks confirm the baseline routing state. They do not yet confirm end-to-end failover.
-
-## Still to test
-
-- Trigger firewall HA failover while sending traffic between the workload networks.
-- Check route withdrawal and installation on both BGWs.
-- Measure packet loss and recovery time.
-- Repeat the checks when moving the active role back to DC1.
-- Complete the BUM replication and inter-site route-target review.
-
-The leaf L2VNIs use multicast groups, while the BGWs use ingress replication. This remains a review item; I have not treated the current configuration as fully validated.
-
 ## Configuration files
 
 The ten Nexus configuration files are stored in the repository root:
