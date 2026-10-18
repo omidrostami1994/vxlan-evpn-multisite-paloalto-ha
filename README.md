@@ -77,8 +77,5 @@ The ten Nexus configuration files are stored in the repository root:
 
 Palo Alto configurations and appliance images are not included.
 
-## Before reusing these configs
-
-This is a lab, not a production deployment template. Review interface mappings, addressing, routing policies, and software-specific behavior before adapting it.
 
 
