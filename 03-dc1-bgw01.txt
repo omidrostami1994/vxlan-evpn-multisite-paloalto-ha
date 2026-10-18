@@ -1,0 +1,241 @@
+hostname dc1-bgw01
+vdc dc1-bgw01 id 1
+  limit-resource vlan minimum 16 maximum 4094
+  limit-resource vrf minimum 2 maximum 4096
+  limit-resource port-channel minimum 0 maximum 511
+  limit-resource m4route-mem minimum 58 maximum 58
+  limit-resource m6route-mem minimum 8 maximum 8
+
+nv overlay evpn
+feature ospf
+feature bgp
+feature pim
+feature fabric forwarding
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+feature sla sender
+evpn multisite border-gateway 100
+  delay-restore time 100
+
+no password strength-check
+username admin password 5 $5$NKDCCE$bC0xOt1bmmMnHMKOzVY/c8B7q17EbARGu8aDzI.cTg9
+ role network-admin
+ip domain-lookup
+track 10 ip sla 10 reachability
+track 20 ip sla 20 reachability
+copp profile strict
+snmp-server user admin network-admin auth md5 4942CF4426454F51156C6CAB7DC04C9573
+E6 priv aes-128 366A9E0C79017C145B3F79A93AA356D621DA localizedV2key
+rmon event 1 log trap public description FATAL(1) owner PMON@FATAL
+rmon event 2 log trap public description CRITICAL(2) owner PMON@CRITICAL
+rmon event 3 log trap public description ERROR(3) owner PMON@ERROR
+rmon event 4 log trap public description WARNING(4) owner PMON@WARNING
+rmon event 5 log trap public description INFORMATION(5) owner PMON@INFO
+
+fabric forwarding anycast-gateway-mac aaaa.bbbb.cccc
+ip pim ssm range 232.0.0.0/8
+vlan 1,100-101,902-903,998-999
+vlan 100
+    name APP
+  vn-segment 1000100
+vlan 101
+  name DB
+  vn-segment 1000101
+vlan 902
+  name TRANSIT-VL100
+vlan 903
+  name TRANSIT-VL101
+vlan 998
+  name L3VNI-DB
+  vn-segment 900102
+vlan 999
+  name L3VNI-APP
+  vn-segment 900101
+
+ip prefix-list TO-FW-APP seq 10 permit 10.104.168.0/24
+ip prefix-list TO-FW-DB seq 10 permit 10.104.169.0/24
+route-map RM-STATIC-APP permit 10
+  match ip address prefix-list TO-FW-DB
+route-map RM-STATIC-DB permit 10
+  match ip address prefix-list TO-FW-APP
+route-map RMAP-REDIST permit 10
+vrf context APP
+  vni 900101
+  ip route 10.104.169.0/24 10.111.0.147 track 10
+  rd auto
+  address-family ipv4 unicast
+    route-target both auto
+    route-target both auto evpn
+vrf context DB
+  vni 900102
+  ip route 10.104.168.0/24 10.111.0.155 track 20
+  rd auto
+  address-family ipv4 unicast
+    route-target both auto
+    route-target both auto evpn
+vrf context management
+
+interface Vlan1
+
+interface Vlan902
+  no shutdown
+  vrf member APP
+  ip address 10.111.0.145/29
+  fabric forwarding mode anycast-gateway
+
+interface Vlan903
+  no shutdown
+  vrf member DB
+  ip address 10.111.0.153/29
+  fabric forwarding mode anycast-gateway
+
+interface Vlan998
+  no shutdown
+  vrf member DB
+  ip forward
+
+interface Vlan999
+  no shutdown
+  vrf member APP
+  ip forward
+
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  multisite border-gateway interface loopback100
+  member vni 900101 associate-vrf
+  member vni 900102 associate-vrf
+  member vni 1000100
+    multisite ingress-replication
+    ingress-replication protocol bgp
+  member vni 1000101
+    multisite ingress-replication
+    ingress-replication protocol bgp
+
+interface Ethernet1/1
+  description to_spine-01
+  mtu 9216
+  medium p2p
+  ip address 10.1.1.1/30
+  ip ospf network point-to-point
+  ip router ospf UNDERLAY area 0.0.0.0
+  no shutdown
+  evpn multisite fabric-tracking
+
+interface Ethernet1/2
+  description to_spine-02
+  mtu 9216
+  medium p2p
+  ip address 10.1.1.5/30
+  ip ospf network point-to-point
+  ip router ospf UNDERLAY area 0.0.0.0
+  no shutdown
+  evpn multisite fabric-tracking
+
+interface Ethernet1/3
+  description to_dci-to-dc-2
+  mtu 9216
+  medium p2p
+  ip address 10.100.100.1/30
+  no shutdown
+  evpn multisite dci-tracking
+
+interface Ethernet1/4
+  description to_fw-01
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 902-903
+  no shutdown
+
+interface mgmt0
+  vrf member management
+
+interface loopback0
+  description underlay
+  ip address 10.0.0.5/32
+  ip router ospf UNDERLAY area 0.0.0.0
+
+interface loopback1
+  description nve 
+  ip address 10.0.1.5/32
+  ip router ospf UNDERLAY area 0.0.0.0
+  ip pim sparse-mode
+
+interface loopback100
+  description multisite
+  ip address 10.111.111.1/32
+  ip router ospf UNDERLAY area 0.0.0.0
+icam monitor scale
+
+line console
+line vty
+router ospf UNDERLAY
+router bgp 100
+  address-family ipv4 unicast
+    redistribute direct route-map RMAP-REDIST
+  address-family l2vpn evpn
+  template peer DC2-BGW
+    remote-as 200
+    update-source loopback0
+    ebgp-multihop 5
+    peer-type fabric-external
+    address-family ipv4 unicast
+      send-community
+      send-community extended
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      rewrite-evpn-rt-asn
+  template peer SPINE
+    remote-as 100
+    update-source loopback0
+    address-family ipv4 unicast
+      send-community
+      send-community extended
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      rewrite-evpn-rt-asn
+  neighbor 10.0.0.1
+    inherit peer SPINE
+  neighbor 10.0.0.2
+    inherit peer SPINE
+  neighbor 10.0.0.25
+    inherit peer DC2-BGW
+  neighbor 10.100.100.2
+    remote-as 200
+    update-source Ethernet1/3
+    address-family ipv4 unicast
+  vrf APP
+    address-family ipv4 unicast
+      redistribute static route-map RM-STATIC-APP
+  vrf DB
+    address-family ipv4 unicast
+      redistribute static route-map RM-STATIC-DB
+evpn
+  vni 1000100 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 1000101 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+
+ip sla 10
+  icmp-echo 10.111.0.147 source-ip 10.111.0.145
+    vrf APP
+    threshold 500
+    timeout 1000
+    frequency 5
+ip sla schedule 10 life forever start-time now
+ip sla 20
+  icmp-echo 10.111.0.155 source-ip 10.111.0.153
+    vrf DB
+    threshold 500
+    timeout 1000
+    frequency 5
+ip sla schedule 20 life forever start-time now
+
