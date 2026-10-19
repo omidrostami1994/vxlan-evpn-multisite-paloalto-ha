@@ -75,7 +75,6 @@ The ten Nexus configuration files are stored in the repository root:
 | [Spine-01](04-dc1-spine01.txt) | [Spine-01](09-dc2-spine01.txt) |
 | [Spine-02](05-dc1-spine02.txt) | [Spine-02](10-dc2-spine02.txt) |
 
-Palo Alto configurations and appliance images are not included.
 
 
 
